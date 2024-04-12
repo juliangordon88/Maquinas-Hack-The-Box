@@ -1,0 +1,24 @@
+Maquina 5 Appointment (SQL Injection)
+Esta maquina es vulnerable a sql injection. Por lo que, en la pagina web que esta corriendo en el IP, tiene un login de acceso. Los querys (input que podemos hacer en user o password) no están parametrizados, por lo que usando el # que sirve para comentar la siguiente linea, estariamos modificando el codigo que utiliza php y mysql para operar.
+Para lograr esto escribiremos en el campo User:
+admin'#
+y en contraseña cualquier cosa.
+Eso nos dará acceso y obtendremos la flag.
+HTTP - Hypertext Transfer Protocol
+Ip:10.129.166.246
+nmap -sC -sV 10.129.166.246
+
+Además en esta maquina nos enseñan a usar gobuster que sirve para realizar fuerza bruta y buscar distintos accesos de forma automatizada en la URL.
+
+usamos este comando:
+gobuster dir --url http://10.129.166.246/ --wordlist /home/kali/SecLists/Discovery/Web-Content/directory-list-2.3-small.txt
+
+Y nos devolvió esta información, que en este caso no tiene demasiada importancia, pero si nos enseña a utilizarla
+/images               (Status: 301) [Size: 317] [--> http://10.129.166.246/images/]
+/css                  (Status: 301) [Size: 314] [--> http://10.129.166.246/css/]
+/js                   (Status: 301) [Size: 313] [--> http://10.129.166.246/js/]
+/vendor               (Status: 301) [Size: 317] [--> http://10.129.166.246/vendor/]
+/fonts                (Status: 301) [Size: 316] [--> http://10.129.166.246/fonts/]
+
+
+Flag: e3d0796d002a446c0e622226f42e9672
