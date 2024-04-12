@@ -1,0 +1,16 @@
+Maquina 6 Sequel MySql
+Ip: 10.129.60.67
+
+mysql -h 10.129.60.67 -u root
+Una vez dentro podemos ejecutar:
+SHOW databases;
+Encontramos 4 filas y una de ellas es htb, para seleccionarla usamos:
+USE htb;
+Para ver que tables contiene htb usamos el comando:
+SHOW tables;
+encontramos 2 tables, config y users
+para ver el table config usamos el comando:
+SELECT * FROM config;
+
+
+Flag: 7b4bec00d1a39e3dd4e021ec3d915da8
