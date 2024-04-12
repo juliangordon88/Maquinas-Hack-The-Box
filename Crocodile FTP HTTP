@@ -1,0 +1,27 @@
+Maquina 7 Crocodile FTP HTTP
+IP: 10.129.1.15
+Como siempre hacemos un nmap -sC -sV para ver que puertos estan abiertos y nos devuelve que el 21 y el 80 estan abiertos. Y además nos dice que Anonymous FTP login allowed (FTP code 230) . Que un login anonimo puede ser utilizado.
+Para conectarnos a traves de FTP utilizaremos el comando:
+ftp 10.129.1.15
+nos preguntara el user y pondremos anonymous como nos indica que podriamos hacerlo.
+Una ves dentro utilizamos el comando dir para que nos liste los archivos.
+Encontró 2 archivos que los descargaremos en nuestro pc con el comando get
+Luego de probar el acceso a traves de FTP con todos los usuarios que habia en el archivo allowed.userlist , y no lograr acceso vamos a probar por otro lado.
+El resultado que nos devolvió nmap, nos dice que el puerto 80 esta abierto y con un servidor Apache httpd 2.4.41.
+Entrando en nuestr browser el ip que tenemos, nos abre una pagina web que parece ser de un servicio de server hosting web. Analizaremos el codigo de esta pagina web, el tipo de servidor web y diferentes tecnologias usadas para construirlo. Para ello instalamos un plugin para nuestro browser que se llama wappalizer.
+Este plugin nos devuelve las distintas tecnologias que se usaron para hacer esta pagina web. Una de ellas es PHP. Por lo que ahora probaremos de encontrar distintos accesos a traves de las URL que podamos llegar a encontrar con Gobuster. Para ello buscaremos con estos parametros:
+dir : Uses directory/file enumeration mode.
+--url : The target URL.
+--wordlist : Path to the wordlist.
+-x : File extension(s) to search for.
+
+el parametro -x nos dice que tipo de extension de archivos queremos buscar, por lo que buscaremos PHP y HTML
+Para ello usaremos el comando que usamos anteriormente agregando el -x php,html
+
+gobuster dir --url http://10.129.1.15/ --wordlist /home/kali/SecLists/Discovery/Web-Content/directory-list-2.3-small.txt -x php,html
+
+gobuster nos devolvió algunas url que nos pueden servir, la principal que probaremos es login.php .
+La que nos redirecciona a una pagina de login/user. Ahora lo que nos falta probar es los usuarios y las contraseñas que obtuvimos anteriormente y ver si logramos entrar.
+Probando admin y la contraseña logramos acceso!
+
+Flag: c7110277ac44d78b6a9fff2232434d16
